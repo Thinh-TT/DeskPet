@@ -1,0 +1,6 @@
+out
+dist
+node_modules
+characters/**/pose/ingredient
+characters/**/ingredient
+coverage

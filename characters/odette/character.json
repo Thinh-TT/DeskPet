@@ -1,0 +1,70 @@
+{
+  "id": "odette",
+  "name": "Odette",
+  "status": "draft",
+  "renderer": "sprite",
+  "size": { "w": 192, "h": 384 },
+  "anchor": { "x": 0.5, "y": 1.0 },
+  "persona": "persona.md",
+  "address": { "self": "tôi", "user": "bạn" },
+  "base": "master/front_neutral.png",
+  "states": {
+    "idle":    { "clip": "idle",  "fallbackPose": "stand", "motion": "breathe" },
+    "walk":    { "clip": "walk",  "facing": "right", "mirrorForLeft": true },
+    "sit":     { "clip": "sit",   "enter": "sit_down", "exit": { "clip": "sit_down", "reverse": true } },
+    "sleep":   { "clip": "sleep", "enter": "sleep_down", "exit": { "clip": "sleep_down", "reverse": true } },
+    "dragged": { "clip": "drag" },
+    "falling": { "clip": "fall" },
+    "land":    { "clip": "land", "next": "idle" },
+    "react":   { "clip": "react", "next": "idle" },
+    "special": { "clip": "dance", "next": "idle" },
+    "talk":    { "clip": "idle", "mouth": "amplitude" },
+    "listen":  { "clip": "idle" },
+    "think":   { "clip": "think" }
+  },
+  "poses": {
+    "stand": "master/front_neutral.png"
+  },
+  "clips": {
+    "idle":       { "pattern": "pose/idle_{n}.png",       "count": 12, "fps": 6,  "loop": true,  "anchor": "feet",   "ready": true },
+    "walk":       { "pattern": "pose/walk_{n}.png",       "count": 12, "fps": 8,  "loop": true,  "anchor": "feet",   "ready": true },
+    "react":      { "pattern": "pose/react_{n}.png",      "count": 10, "fps": 12, "loop": false, "anchor": "feet",   "ready": true },
+    "think":      { "pattern": "pose/think_{n}.png",      "count": 12, "fps": 6,  "loop": true,  "anchor": "feet",   "ready": true },
+    "dance":      { "pattern": "pose/dance_{n}.png",      "count": 14, "fps": 12, "loop": false, "anchor": "feet",   "ready": true },
+    "sit_down":   { "pattern": "pose/sit_down_{n}.png",   "count": 12, "fps": 10, "loop": false, "anchor": "feet",   "ready": true },
+    "sit":        { "pattern": "pose/sit_{n}.png",        "count": 12, "fps": 6,  "loop": true,  "anchor": "feet",   "ready": true },
+    "sleep_down": { "pattern": "pose/sleep_down_{n}.png", "count": 12, "fps": 8,  "loop": false, "anchor": "feet",   "ready": true },
+    "sleep":      { "pattern": "pose/sleep_{n}.png",      "count": 12, "fps": 4,  "loop": true,  "anchor": "feet",   "ready": true },
+    "drag":       { "pattern": "pose/drag_{n}.png",       "count": 13, "fps": 8,  "loop": true,  "anchor": "head",   "ready": true },
+    "fall":       { "pattern": "pose/fall_{n}.png",       "count": 12, "fps": 12, "loop": true,  "anchor": "center", "ready": true },
+    "land":       { "pattern": "pose/land_{n}.png",       "count": 10, "fps": 12, "loop": false, "anchor": "feet",   "ready": true }
+  },
+  "expressions": {
+    "neutral": "expr/neutral.png",
+    "happy": "expr/happy.png",
+    "soft": "expr/soft.png",
+    "sad": "expr/sad.png",
+    "angry": "expr/angry.png",
+    "surprised": "expr/surprised.png",
+    "shy": "expr/shy.png",
+    "thinking": "expr/thinking.png",
+    "sleepy": "expr/sleepy.png",
+    "blink": "expr/blink.png"
+  },
+  "emotions": {
+    "neutral": { "expression": "neutral" },
+    "happy": { "expression": "happy", "motion": "hop" },
+    "soft": { "expression": "soft" },
+    "sad": { "expression": "sad" },
+    "angry": { "expression": "angry" },
+    "surprised": { "expression": "surprised", "motion": "hop" },
+    "shy": { "expression": "shy" },
+    "thinking": { "expression": "thinking" },
+    "sleepy": { "expression": "sleepy" }
+  },
+  "mouth": {
+    "closed": "mouth/m0.png",
+    "half": "mouth/m1.png",
+    "open": "mouth/m2.png"
+  }
+}
