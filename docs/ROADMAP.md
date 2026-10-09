@@ -11,13 +11,13 @@ Mỗi giai đoạn (GĐ) kết thúc bằng một bản **chạy được, demo 
 ✅ Xong khi: `npm run dev` mở cửa sổ trống; có ≥ 1 bộ ảnh nhân vật nhất quán.
 
 ## GĐ1 – Pet cơ bản (Tầng 1)
-- [ ] Cửa sổ trong suốt, always-on-top, tray.
-- [ ] Spike click-through theo pixel + đa màn hình + DPI → ADR.
-- [ ] `CharacterRenderer` (PixiJS) + loader Character Pack + schema + `validate-pack`.
-- [ ] Behavior state machine: idle/walk/sit/sleep (có unit test).
-- [ ] Tương tác: click, double-click, kéo thả, rơi xuống.
-- [ ] Settings tối thiểu + auto-start.
-- [ ] Nhân vật thứ 2 (placeholder) để chứng minh đổi pack.
+- [x] Cửa sổ trong suốt, always-on-top, tray.
+- [x] Spike click-through theo pixel + đa màn hình + DPI → ADR.
+- [x] `CharacterRenderer` (PixiJS) + loader Character Pack + schema + `validate-pack`.
+- [x] Behavior state machine: idle/walk/sit/sleep (có unit test).
+- [x] Tương tác: click, double-click, kéo thả, rơi xuống.
+- [x] Settings tối thiểu + auto-start.
+- [x] Nhân vật thứ 2 (placeholder) để chứng minh đổi pack.
 
 ✅ Xong khi: đạt tiêu chí MVP trong SPEC §5.
 

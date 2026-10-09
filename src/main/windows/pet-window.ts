@@ -1,22 +1,74 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, screen } from 'electron';
+import { existsSync } from 'fs';
 import { join } from 'path';
+import { Bounds2D } from '../behavior/types';
+
+export function getPrimaryWorkAreaBounds(): Bounds2D {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { x, y, width, height } = primaryDisplay.workArea;
+  return { x, y, width, height };
+}
+
+function resolvePreloadPath(): string {
+  const mjsPath = join(__dirname, '../preload/index.mjs');
+  if (existsSync(mjsPath)) {
+    return mjsPath;
+  }
+  return join(__dirname, '../preload/index.js');
+}
 
 export function createPetWindow(): BrowserWindow {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { x, y, width, height } = primaryDisplay.workArea;
+
   const window = new BrowserWindow({
-    width: 400,
-    height: 500,
+    x,
+    y,
+    width,
+    height,
     show: false,
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     transparent: true,
     frame: false,
     hasShadow: false,
     alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    focusable: false,
+    type: 'toolbar',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: false,
+    roundedCorners: false,
+    backgroundMaterial: 'none',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: resolvePreloadPath(),
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false
     }
+  });
+
+  // Permanently strip all menu bars from the pet window
+  window.setMenu(null);
+  window.removeMenu();
+  window.setMenuBarVisibility(false);
+  window.setAutoHideMenuBar(false);
+
+  // Prevent Alt key from toggling any system menus
+  window.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'Alt') {
+      event.preventDefault();
+    }
+  });
+
+  // Enable initial click-through on Windows
+  window.setIgnoreMouseEvents(true, { forward: true });
+
+  window.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    console.log(`[Renderer Log ${level}] ${message} (${sourceId}:${line})`);
   });
 
   window.on('ready-to-show', () => {

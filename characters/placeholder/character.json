@@ -1,0 +1,33 @@
+{
+  "id": "placeholder",
+  "name": "Kuro Placeholder",
+  "status": "release",
+  "renderer": "sprite",
+  "size": { "w": 192, "h": 192 },
+  "anchor": { "x": 0.5, "y": 1.0 },
+  "base": "master/front_neutral.png",
+  "states": {
+    "idle": { "clip": "idle", "fallbackPose": "stand" },
+    "walk": { "clip": "idle", "fallbackPose": "stand" },
+    "sit": { "clip": "idle", "fallbackPose": "stand" },
+    "sleep": { "clip": "idle", "fallbackPose": "stand" },
+    "dragged": { "clip": "idle", "fallbackPose": "stand" },
+    "falling": { "clip": "idle", "fallbackPose": "stand" },
+    "land": { "clip": "idle", "fallbackPose": "stand" },
+    "react": { "clip": "idle", "fallbackPose": "stand" }
+  },
+  "poses": {
+    "stand": "master/front_neutral.png"
+  },
+  "clips": {},
+  "expressions": {
+    "neutral": "expr/neutral.png",
+    "happy": "expr/happy.png"
+  },
+  "emotions": {
+    "happy": { "expression": "happy" }
+  },
+  "mouth": {
+    "closed": "mouth/m0.png"
+  }
+}
