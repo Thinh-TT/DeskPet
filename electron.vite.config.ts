@@ -1,5 +1,6 @@
 import { resolve } from 'path';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   main: {
@@ -34,6 +35,7 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
+    plugins: [react()],
     resolve: {
       alias: {
         '@shared': resolve('src/shared')
@@ -42,7 +44,8 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          pet: resolve(__dirname, 'src/renderer/pet/index.html')
+          pet: resolve(__dirname, 'src/renderer/pet/index.html'),
+          ui: resolve(__dirname, 'src/renderer/ui/index.html')
         }
       }
     }

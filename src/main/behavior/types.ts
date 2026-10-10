@@ -6,7 +6,10 @@ export type PetState =
   | 'dragged'
   | 'falling'
   | 'land'
-  | 'react';
+  | 'react'
+  | 'think'
+  | 'talk'
+  | 'listen';
 
 export type FacingDirection = 'left' | 'right';
 
@@ -28,6 +31,7 @@ export interface PetSnapshot {
   velocity: Vector2D;
   facing: FacingDirection;
   scale: number;
+  expression?: string;
 }
 
 export interface BehaviorConfig {

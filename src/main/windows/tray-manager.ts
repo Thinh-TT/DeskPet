@@ -9,7 +9,8 @@ export class TrayManager {
     private readonly getPetWindow: () => BrowserWindow | null,
     private readonly packLoader: CharacterPackLoader,
     private readonly settingsStore: SettingsStore,
-    private readonly onSelectCharacter: (packId: string) => void
+    private readonly onSelectCharacter: (packId: string) => void,
+    private readonly onOpenChat?: () => void
   ) {}
 
   async init(): Promise<void> {
@@ -45,6 +46,10 @@ export class TrayManager {
     );
 
     const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Trò chuyện... (Chat)',
+        click: (): void => this.onOpenChat?.()
+      },
       {
         label: 'Hiện / Ẩn DeskPet',
         click: (): void => this.togglePetVisibility()

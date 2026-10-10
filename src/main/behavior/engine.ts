@@ -14,6 +14,7 @@ export class BehaviorEngine {
   private readonly physics: PhysicsSimulation;
   private facing: FacingDirection = 'right';
   private scale = 1.0;
+  private currentExpression?: string;
   private config: BehaviorConfig;
   private intervalTimer: NodeJS.Timeout | null = null;
   private listeners: ((snapshot: PetSnapshot) => void)[] = [];
@@ -46,7 +47,8 @@ export class BehaviorEngine {
       position: this.physics.getPosition(),
       velocity: this.physics.getVelocity(),
       facing: this.facing,
-      scale: this.scale
+      scale: this.scale,
+      expression: this.currentExpression
     };
   }
 
@@ -61,6 +63,15 @@ export class BehaviorEngine {
 
   setSpeed(speed: number): void {
     this.config.walkSpeed = speed;
+  }
+
+  setExpression(expression?: string): void {
+    this.currentExpression = expression;
+    this.notifyUpdate();
+  }
+
+  setPaused(paused: boolean): void {
+    this.stateMachine.setPaused(paused);
   }
 
   onUpdate(callback: (snapshot: PetSnapshot) => void): () => void {

@@ -22,12 +22,12 @@ Mỗi giai đoạn (GĐ) kết thúc bằng một bản **chạy được, demo 
 ✅ Xong khi: đạt tiêu chí MVP trong SPEC §5.
 
 ## GĐ2 – Trò chuyện text (Tầng 2)
-- [ ] Cửa sổ chat + bong bóng thoại, streaming.
-- [ ] `LLMProvider` + adapter Gemini (đầu tiên), rồi OpenAI/Claude; chọn provider trong Settings.
-- [ ] Lưu key an toàn.
-- [ ] Persona từ pack; parser thẻ cảm xúc → animation.
-- [ ] Quản lý ngữ cảnh (cửa sổ trượt + tóm tắt).
-- [ ] Xử lý lỗi/offline/giới hạn rate.
+- [x] Cửa sổ chat + bong bóng thoại, streaming.
+- [x] `LLMProvider` + adapter Gemini (đầu tiên), rồi Deepseek; chọn provider trong Settings.
+- [x] Lưu key an toàn.
+- [x] Persona từ pack; parser thẻ cảm xúc → animation.
+- [x] Quản lý ngữ cảnh (cửa sổ trượt + tóm tắt).
+- [x] Xử lý lỗi/offline/giới hạn rate.
 
 ✅ Xong khi: trò chuyện tiếng Việt tự nhiên, nhân vật đổi biểu cảm theo nội dung, đổi provider không cần restart.
 

@@ -12,6 +12,7 @@ export class BehaviorStateMachine {
   private currentState: PetState = 'idle';
   private stateTimerMs = 0;
   private targetDurationMs = 0;
+  private isPaused = false;
   private readonly config: BehaviorConfig;
 
   constructor(config: Partial<BehaviorConfig> = {}) {
@@ -24,6 +25,10 @@ export class BehaviorStateMachine {
 
   getState(): PetState {
     return this.currentState;
+  }
+
+  setPaused(paused: boolean): void {
+    this.isPaused = paused;
   }
 
   dispatch(event: StateMachineEvent): PetState {
@@ -69,7 +74,7 @@ export class BehaviorStateMachine {
 
     switch (this.currentState) {
       case 'idle':
-        if (this.stateTimerMs >= this.targetDurationMs) {
+        if (!this.isPaused && this.stateTimerMs >= this.targetDurationMs) {
           const rand = Math.random();
           if (rand < 0.6) {
             this.transitionTo('walk');
@@ -111,9 +116,12 @@ export class BehaviorStateMachine {
         }
         break;
 
+      case 'think':
+      case 'talk':
+      case 'listen':
       case 'dragged':
       case 'falling':
-        // Duration not time-based
+        // Các trạng thái được điều khiển trực tiếp hoặc theo ngữ cảnh
         break;
     }
   }

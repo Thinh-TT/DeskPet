@@ -2,15 +2,24 @@ import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron';
 import { resolve } from 'path';
 import { CharacterPackLoader } from './character/pack-loader';
 import { SettingsStore } from './config/settings-store';
+import { SecretsStore } from './config/secrets-store';
 import { BehaviorEngine } from './behavior/engine';
 import { TrayManager } from './windows/tray-manager';
+import { ChatWindowManager } from './windows/chat-window';
 import { createPetWindow, getPrimaryWorkAreaBounds } from './windows/pet-window';
+import { LLMManager } from './llm/llm-manager';
+import { ContextManager } from './conversation/context-manager';
+import { ConversationOrchestrator } from './conversation/orchestrator';
 import {
   AppSettings,
+  ChatMessage,
+  ChatSendMessagePayloadSchema,
   IpcChannel,
   PetPingPayloadSchema,
   PetPingResponse,
   PetUserActionPayloadSchema,
+  SecretsSetKeyPayloadSchema,
+  SecretsStatus,
   SetIgnoreMousePayloadSchema
 } from '../shared/ipc/channels';
 import { CharacterManifest } from '../shared/character/schema';
@@ -19,14 +28,28 @@ export class PetCoordinator {
   private petWindow: BrowserWindow | null = null;
   private packLoader: CharacterPackLoader;
   private settingsStore: SettingsStore;
+  private secretsStore: SecretsStore;
   private behaviorEngine: BehaviorEngine | null = null;
   private trayManager: TrayManager | null = null;
+  private chatWindowManager: ChatWindowManager;
+  private llmManager: LLMManager;
+  private contextManager: ContextManager;
+  private orchestrator: ConversationOrchestrator;
   private currentManifest: CharacterManifest | null = null;
+  private charactersDir: string;
 
   constructor() {
-    const charactersDir = resolve(app.getAppPath(), 'characters');
-    this.packLoader = new CharacterPackLoader(charactersDir);
+    this.charactersDir = resolve(app.getAppPath(), 'characters');
+    this.packLoader = new CharacterPackLoader(this.charactersDir);
     this.settingsStore = new SettingsStore();
+    this.secretsStore = new SecretsStore();
+    this.chatWindowManager = new ChatWindowManager();
+    this.llmManager = new LLMManager(this.settingsStore, this.secretsStore);
+    this.contextManager = new ContextManager();
+    this.orchestrator = new ConversationOrchestrator(
+      this.contextManager,
+      this.llmManager
+    );
   }
 
   async init(): Promise<void> {
@@ -37,10 +60,12 @@ export class PetCoordinator {
     try {
       const pack = await this.packLoader.loadPack(settings.characterId);
       this.currentManifest = pack.manifest;
+      this.contextManager.loadCharacter(pack.baseDir, pack.manifest);
     } catch {
       // Fallback to odette
       const pack = await this.packLoader.loadPack('odette');
       this.currentManifest = pack.manifest;
+      this.contextManager.loadCharacter(pack.baseDir, pack.manifest);
       this.settingsStore.updateSettings({ characterId: 'odette' });
     }
 
@@ -80,6 +105,9 @@ export class PetCoordinator {
       this.settingsStore,
       (packId) => {
         void this.changeCharacter(packId);
+      },
+      () => {
+        this.toggleChatWindow();
       }
     );
     await this.trayManager.init();
@@ -93,6 +121,7 @@ export class PetCoordinator {
     try {
       const pack = await this.packLoader.loadPack(packId);
       this.currentManifest = pack.manifest;
+      this.contextManager.loadCharacter(pack.baseDir, pack.manifest);
       this.settingsStore.updateSettings({ characterId: packId });
 
       if (this.petWindow && !this.petWindow.isDestroyed()) {
@@ -101,8 +130,31 @@ export class PetCoordinator {
           this.currentManifest
         );
       }
+
+      const chatWin = this.chatWindowManager.getWindow();
+      if (chatWin && !chatWin.isDestroyed()) {
+        chatWin.webContents.send(
+          IpcChannel.PET_CHANGE_CHARACTER,
+          this.currentManifest
+        );
+      }
     } catch (err) {
       console.error(`Failed to change character to ${packId}:`, err);
+    }
+  }
+
+  toggleChatWindow(): void {
+    if (!this.behaviorEngine) return;
+    const pos = this.behaviorEngine.getSnapshot().position;
+    const chatWin = this.chatWindowManager.getWindow();
+
+    if (chatWin && chatWin.isVisible()) {
+      this.chatWindowManager.hide();
+      this.behaviorEngine.setPaused(false);
+    } else {
+      this.chatWindowManager.showNearPet(pos.x, pos.y);
+      this.behaviorEngine.setPaused(true);
+      this.behaviorEngine.forceState('listen');
     }
   }
 
@@ -158,8 +210,10 @@ export class PetCoordinator {
         const action = parsed.data;
         switch (action.action) {
           case 'click':
-          case 'dblclick':
             this.behaviorEngine.handleClick();
+            break;
+          case 'dblclick':
+            this.toggleChatWindow();
             break;
           case 'dragStart':
             this.behaviorEngine.handleDragStart();
@@ -192,11 +246,102 @@ export class PetCoordinator {
         return updated;
       }
     );
+
+    // Chat & LLM IPC
+    ipcMain.handle(
+      IpcChannel.CHAT_SEND_MESSAGE,
+      async (_event, rawPayload: unknown): Promise<void> => {
+        const parsed = ChatSendMessagePayloadSchema.safeParse(rawPayload);
+        if (!parsed.success) {
+          throw new Error(`Dữ liệu tin nhắn không hợp lệ: ${parsed.error.message}`);
+        }
+
+        const chatWin = this.chatWindowManager.getWindow();
+
+        await this.orchestrator.handleUserMessage(parsed.data.text, {
+          onChunk: (messageId, delta) => {
+            if (chatWin && !chatWin.isDestroyed()) {
+              chatWin.webContents.send(IpcChannel.CHAT_STREAM_CHUNK, {
+                messageId,
+                delta
+              });
+            }
+          },
+          onDone: (messageId, fullContent, emotion) => {
+            if (chatWin && !chatWin.isDestroyed()) {
+              chatWin.webContents.send(IpcChannel.CHAT_STREAM_DONE, {
+                messageId,
+                fullContent,
+                emotion
+              });
+            }
+          },
+          onError: (messageId, error) => {
+            if (chatWin && !chatWin.isDestroyed()) {
+              chatWin.webContents.send(IpcChannel.CHAT_STREAM_ERROR, {
+                messageId,
+                error
+              });
+            }
+          },
+          onEmotion: (emotion) => {
+            if (this.behaviorEngine) {
+              this.behaviorEngine.setExpression(emotion);
+            }
+          },
+          onStateChange: (state) => {
+            if (this.behaviorEngine) {
+              this.behaviorEngine.forceState(state);
+            }
+          }
+        });
+      }
+    );
+
+    ipcMain.handle(IpcChannel.CHAT_GET_HISTORY, (): ChatMessage[] => {
+      return this.orchestrator.getHistory();
+    });
+
+    ipcMain.handle(IpcChannel.CHAT_CLEAR_HISTORY, (): void => {
+      this.orchestrator.clearHistory();
+    });
+
+    ipcMain.handle(IpcChannel.CHAT_TOGGLE_WINDOW, (): void => {
+      this.toggleChatWindow();
+    });
+
+    ipcMain.handle(
+      IpcChannel.CHAT_TEST_CONNECTION,
+      async (): Promise<{ success: boolean; message: string }> => {
+        return this.llmManager.testActiveConnection();
+      }
+    );
+
+    // Secrets IPC
+    ipcMain.handle(
+      IpcChannel.SECRETS_SET_KEY,
+      (_event, rawPayload: unknown): void => {
+        const parsed = SecretsSetKeyPayloadSchema.safeParse(rawPayload);
+        if (!parsed.success) {
+          throw new Error(`Dữ liệu key không hợp lệ: ${parsed.error.message}`);
+        }
+        this.secretsStore.setApiKey(parsed.data.provider, parsed.data.apiKey);
+      }
+    );
+
+    ipcMain.handle(IpcChannel.SECRETS_GET_STATUS, (): SecretsStatus => {
+      return this.secretsStore.getStatus();
+    });
   }
 
   private showContextMenu(): void {
     if (!this.petWindow) return;
     const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Trò chuyện... (Chat)',
+        click: (): void => this.toggleChatWindow()
+      },
+      { type: 'separator' },
       {
         label: 'Vuốt ve (Phản ứng)',
         click: (): void => this.behaviorEngine?.handleClick()
@@ -223,7 +368,7 @@ export class PetCoordinator {
         click: (): void => app.quit()
       }
     ]);
-    contextMenu.popup({ window: this.petWindow });
+    contextMenu.popup();
   }
 
   destroy(): void {
@@ -235,5 +380,6 @@ export class PetCoordinator {
       this.trayManager.destroy();
       this.trayManager = null;
     }
+    this.chatWindowManager.destroy();
   }
 }

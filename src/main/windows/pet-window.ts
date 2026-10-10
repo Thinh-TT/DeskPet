@@ -40,15 +40,29 @@ export function createPetWindow(): BrowserWindow {
     focusable: false,
     type: 'toolbar',
     titleBarStyle: 'hidden',
-    titleBarOverlay: false,
+    titleBarOverlay: {
+      color: '#00000000',
+      symbolColor: '#00000000',
+      height: 0
+    },
     roundedCorners: false,
     backgroundMaterial: 'none',
+    backgroundColor: '#00000000',
+    title: '',
+    thickFrame: false,
     webPreferences: {
       preload: resolvePreloadPath(),
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false
     }
+  });
+
+  window.setTitle('');
+
+  // Safeguard: immediately discard OS focus if redirected to pet window
+  window.on('focus', () => {
+    window.blur();
   });
 
   // Permanently strip all menu bars from the pet window

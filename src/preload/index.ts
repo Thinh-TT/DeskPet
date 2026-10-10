@@ -1,12 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import {
   AppSettings,
+  ChatMessage,
+  ChatSendMessagePayload,
+  ChatStreamChunk,
+  ChatStreamDone,
+  ChatStreamError,
   DeskPetApi,
   IpcChannel,
   PetPingPayload,
   PetPingResponse,
   PetSnapshot,
-  PetUserActionPayload
+  PetUserActionPayload,
+  SecretsSetKeyPayload,
+  SecretsStatus
 } from '../shared/ipc/channels';
 import { CharacterManifest } from '../shared/character/schema';
 
@@ -49,7 +56,60 @@ const api: DeskPetApi = {
     return () => {
       ipcRenderer.removeListener(IpcChannel.PET_CHANGE_CHARACTER, listener);
     };
-  }
+  },
+
+  // Chat APIs
+  sendMessage: (payload: ChatSendMessagePayload): Promise<void> =>
+    ipcRenderer.invoke(IpcChannel.CHAT_SEND_MESSAGE, payload),
+
+  getChatHistory: (): Promise<ChatMessage[]> =>
+    ipcRenderer.invoke(IpcChannel.CHAT_GET_HISTORY),
+
+  clearChatHistory: (): Promise<void> =>
+    ipcRenderer.invoke(IpcChannel.CHAT_CLEAR_HISTORY),
+
+  toggleChatWindow: (): Promise<void> =>
+    ipcRenderer.invoke(IpcChannel.CHAT_TOGGLE_WINDOW),
+
+  testConnection: (): Promise<{ success: boolean; message: string }> =>
+    ipcRenderer.invoke(IpcChannel.CHAT_TEST_CONNECTION),
+
+  onStreamChunk: (callback: (chunk: ChatStreamChunk) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, chunk: ChatStreamChunk): void => {
+      callback(chunk);
+    };
+    ipcRenderer.on(IpcChannel.CHAT_STREAM_CHUNK, listener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannel.CHAT_STREAM_CHUNK, listener);
+    };
+  },
+
+  onStreamDone: (callback: (done: ChatStreamDone) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, done: ChatStreamDone): void => {
+      callback(done);
+    };
+    ipcRenderer.on(IpcChannel.CHAT_STREAM_DONE, listener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannel.CHAT_STREAM_DONE, listener);
+    };
+  },
+
+  onStreamError: (callback: (err: ChatStreamError) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, err: ChatStreamError): void => {
+      callback(err);
+    };
+    ipcRenderer.on(IpcChannel.CHAT_STREAM_ERROR, listener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannel.CHAT_STREAM_ERROR, listener);
+    };
+  },
+
+  // Secrets APIs
+  setApiKey: (payload: SecretsSetKeyPayload): Promise<void> =>
+    ipcRenderer.invoke(IpcChannel.SECRETS_SET_KEY, payload),
+
+  getSecretsStatus: (): Promise<SecretsStatus> =>
+    ipcRenderer.invoke(IpcChannel.SECRETS_GET_STATUS)
 };
 
 if (process.contextIsolated) {
