@@ -26,13 +26,18 @@
   - Vùng cơ thể nhân vật (Sprite Alpha > 0.1) **HOẶC** con trỏ chuột nằm trong phạm vi Chat Panel DOM: Renderer phát tín hiệu `setIgnoreMouse(false)` để bắt sự kiện chuột (click, kéo thả, chọn text, cuộn danh sách).
   - Toàn bộ vùng màn hình còn lại: Renderer phát tín hiệu `setIgnoreMouse(true, { forward: true })` để chuột xuyên thấu xuống Desktop và ứng dụng bên dưới.
 
-### 3. Quản lý Focus Động (Dynamic Focusability)
-- Cửa sổ duy nhất mặc định duy trì `focusable: false` (`WS_EX_NOACTIVATE`) để người dùng tương tác, kéo thả nhân vật hoặc rê chuột vào khung chat mà không làm mất focus của ứng dụng người dùng đang làm việc (Word, IDE, Browser...).
-- Khi người dùng click vào ô nhập liệu (`input`/`textarea`) của Chat Panel:
-  - Renderer gửi IPC yêu cầu Main gọi `win.setFocusable(true)` và `win.focus()`.
-- Khi ô nhập liệu mất tiêu điểm (`blur`), người dùng click ra ngoài, hoặc khung chat đóng:
-  - Main process gọi `win.setFocusable(false)` và nhả focus về cho hệ điều hành.
-- **Kết quả**: Không còn tồn tại 2 HWND trong cùng tiến trình, loại bỏ hoàn toàn mầm mống chuyển đổi active window nội bộ gây lỗi vẽ thanh tiêu đề DWM.
+### 3. Cơ chế Tiêu Điểm Bền Vững (Permanent Focusable Architecture)
+- **Thực nghiệm & Phát hiện quan trọng trên Windows 11 DWM**:
+  - Khi gọi `win.setFocusable(false)` hoặc `win.setFocusable(true)` động trong runtime, Electron kích hoạt Win32 API `SetWindowLongPtr` gửi cờ `SWP_FRAMECHANGED` tới Desktop Window Manager.
+  - Windows DWM khi nhận `SWP_FRAMECHANGED` sẽ tự động tính toán lại non-client area và vẽ lại thanh tiêu đề (caption trắng chứa chữ "DeskPet") ở góc trên màn hình.
+  - Ngoài ra, các cờ `type: 'toolbar'` (`WS_EX_TOOLWINDOW`) hoặc `titleBarStyle: 'hidden'` trên Windows cũng là nguồn gốc kích hoạt caption frame của hệ điều hành.
+  - **Hiện tượng "Nét chữ điêu khắc" (Color Keying)**: Khi DWM vẽ text hệ thống màu đen `RGB(0,0,0)` (`0x00000000`) lên Layered Transparent Window, Windows hiểu mã màu này là Color Key trong suốt tuyệt đối nên các nét chữ bị "đục thủng" lộ rõ icon nền desktop. Dải màu xanh xám xung quanh chữ chính là `COLOR_INACTIVECAPTION` do DWM vẽ khi cửa sổ mất tiêu điểm (`blur`), không thể can thiệp bằng CSS hay web code.
+- **Giải pháp dứt điểm**:
+  - Cửa sổ `PetWindow` được cấu hình **cố định `focusable: true`** ngay từ khi khởi tạo, loại bỏ `type: 'toolbar'`, `titleBarStyle` và `titleBarOverlay`.
+  - Tuyệt đối **không gọi `win.setFocusable(false)` động** trong toàn bộ vòng đời ứng dụng.
+  - **Nâng cấp Electron lên v38+ (khắc phục GitHub Issue #46882)**: Nâng cấp `electron` từ `v35.7.5` lên `v38.8.6`. Ở phiên bản này, Electron và Chromium đã vá triệt để lỗi xử lý `WM_NCACTIVATE` / `WM_NCPAINT`, ngăn chặn hoàn toàn việc DWM vẽ lại Inactive Caption bar khi cửa sổ frameless transparent bị mất tiêu điểm trên Windows 11.
+  - Trạng thái không cướp tiêu điểm của ứng dụng nền được đảm bảo 100% nhờ cơ chế **Click-Through (`setIgnoreMouseEvents(true, { forward: true })`)**: Khi chuột nằm ở vùng trong suốt, mọi cú click rơi trực tiếp xuống ứng dụng bên dưới (Chrome, IDE, Desktop), `PetWindow` hoàn toàn không nhận active click.
+  - Khi người dùng click vào Chat Panel, cửa sổ lập tức nhận tiêu điểm bàn phím, con trỏ nhấp nháy trong ô input và bộ gõ tiếng Việt (IME) hoạt động chuẩn xác mà không có bất kỳ hiện tượng tái tạo title bar nào từ DWM.
 
 ### 4. Định vị Chat Panel bằng CSS Tương Đối
 - Vị trí của Chat Panel được neo trực tiếp theo toạ độ logic `(x, y)` của sprite nhân vật ngay trong cùng một trang web thông qua CSS `transform: translate(x, y)` hoặc Absolute positioning.
@@ -41,11 +46,12 @@
 ## Hệ quả & Đánh đổi
 
 ### Tích cực
-- **Triệt tiêu nguyên nhân gốc rễ lỗi UI**: Loại bỏ hoàn toàn mâu thuẫn giữa 2 HWND độc lập trên Windows 11 DWM.
+- **Triệt tiêu nguyên nhân gốc rễ lỗi UI**: Loại bỏ hoàn toàn mâu thuẫn giữa 2 HWND độc lập trên Windows 11 DWM và giải quyết dứt điểm regression titlebar khi blur.
 - **Trải nghiệm mượt mà**: Bong bóng chat di chuyển đồng bộ 100% với từng bước đi của nhân vật (60 FPS), không có độ trễ IPC giữa 2 cửa sổ.
 - **Đơn giản hóa mã nguồn**: Không cần quản lý vòng đời, hiển thị, ẩn hiện, hủy cửa sổ phụ (`ChatWindowManager`).
+- **Gõ tiếng Việt ổn định**: Ô input nhận bàn phím ngay lập tức, tương thích đầy đủ với các bộ gõ Unikey/EVKey.
 
 ### Đánh đổi & Giải pháp kiểm soát
-- **Renderer hợp nhất**: Renderer của Pet Window sẽ tải cả PixiJS và React UI. Cần tổ chức code tách bạch giữa component chat và canvas PixiJS.
-- **Hỗ trợ Bộ gõ tiếng Việt (IME)**: Khi kích hoạt `setFocusable(true)` động, cần kiểm tra đảm bảo các bộ gõ tiếng Việt phổ biến (Unikey, EVKey, Windows Telex) nhận diện đúng trường nhập văn bản và gõ dấu bình thường.
-- **Giữ vững các cờ chống DWM frame**: Cửa sổ vẫn cần giữ nguyên `thickFrame: false`, `frame: false`, `transparent: true`, `backgroundColor: '#00000000'` để đảm bảo an toàn tuyệt đối khi chuyển đổi trạng thái `focusable`.
+- **Renderer hợp nhất**: Renderer của Pet Window tải cả PixiJS và React UI. Cần tổ chức code tách bạch giữa component chat và canvas PixiJS.
+- **Giữ vững các cờ chống DWM frame**: Cửa sổ duy trì `thickFrame: false`, `frame: false`, `transparent: true`, `backgroundColor: '#00000000'`, và thụt lề 2px (`y: y + 2, height: height - 2`) để DWM không hiểu lầm là maximized window.
+- **Yêu cầu phiên bản runtime**: Đòi hỏi Electron ≥ v38 để duy trì tính ổn định của DWM non-client rendering trên Windows 11.

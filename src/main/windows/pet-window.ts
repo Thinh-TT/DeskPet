@@ -6,7 +6,8 @@ import { Bounds2D } from '../behavior/types';
 export function getPrimaryWorkAreaBounds(): Bounds2D {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { x, y, width, height } = primaryDisplay.workArea;
-  return { x, y, width, height };
+  // Offset by 2px from top/bottom to avoid Windows DWM treating as maximized/fullscreen
+  return { x, y: y + 2, width, height: height - 2 };
 }
 
 function resolvePreloadPath(): string {
@@ -26,7 +27,7 @@ export function createPetWindow(): BrowserWindow {
     width: bounds.width,
     height: bounds.height,
     show: false,
-    autoHideMenuBar: false,
+    autoHideMenuBar: true,
     frame: false,
     transparent: true,
     thickFrame: false,
@@ -36,7 +37,7 @@ export function createPetWindow(): BrowserWindow {
     fullscreenable: false,
     hasShadow: false,
     skipTaskbar: true,
-    focusable: false,
+    focusable: true,
     alwaysOnTop: true,
     roundedCorners: false,
     backgroundMaterial: 'none',

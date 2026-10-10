@@ -62,9 +62,56 @@ async function bootstrap(): Promise<void> {
     syncIgnoreMouse();
   });
 
+  const checkUiHitTest = (clientX: number, clientY: number): void => {
+    const chatPanel = document.querySelector('.single-window-chat');
+    const settingsPanel = document.querySelector('.settings-modal-panel');
+    let overUi = false;
+
+    if (chatPanel) {
+      const rect = chatPanel.getBoundingClientRect();
+      if (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      ) {
+        overUi = true;
+      }
+    }
+
+    if (!overUi && settingsPanel) {
+      const rect = settingsPanel.getBoundingClientRect();
+      if (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      ) {
+        overUi = true;
+      }
+    }
+
+    if (overUi !== isOverUi) {
+      isOverUi = overUi;
+      syncIgnoreMouse();
+    }
+  };
+
+  window.addEventListener('mousemove', (e) => {
+    checkUiHitTest(e.clientX, e.clientY);
+  });
+  window.addEventListener('pointermove', (e) => {
+    checkUiHitTest(e.clientX, e.clientY);
+  });
+  window.addEventListener('pointerdown', (e) => {
+    checkUiHitTest(e.clientX, e.clientY);
+  });
+
   const handleUiPointerChange = (isOver: boolean): void => {
-    isOverUi = isOver;
-    syncIgnoreMouse();
+    if (isOver !== isOverUi) {
+      isOverUi = isOver;
+      syncIgnoreMouse();
+    }
   };
 
   // 3. Mount React UI Overlay

@@ -31,10 +31,22 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = (): void => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      // Auto-focus textarea and request window focus when opened
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+        void window.deskPetApi?.setFocusable(true);
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     scrollToBottom();
@@ -214,6 +226,9 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
       }}
       onMouseEnter={onUiPointerEnter}
       onMouseLeave={onUiPointerLeave}
+      onPointerDown={() => {
+        void window.deskPetApi?.setIgnoreMouse(false);
+      }}
     >
       {/* Header */}
       <header
@@ -307,8 +322,15 @@ export const ChatOverlay: React.FC<ChatOverlayProps> = ({
 
       {/* Footer / Input */}
       <footer className="chat-footer">
-        <div className="input-group">
+        <div
+          className="input-group"
+          onClick={() => {
+            inputRef.current?.focus();
+            void window.deskPetApi?.setFocusable(true);
+          }}
+        >
           <textarea
+            ref={inputRef}
             className="chat-input"
             placeholder={`Trò chuyện với ${petName}... (Enter để gửi)`}
             value={inputText}

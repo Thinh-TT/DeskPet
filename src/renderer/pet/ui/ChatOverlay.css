@@ -280,11 +280,11 @@
   40% { transform: translateY(-5px); opacity: 1; }
 }
 
-/* Chat Footer / Input */
 .chat-footer {
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.03);
   border-top: 1px solid var(--border-glass);
+  cursor: default;
 }
 
 .input-group {
@@ -295,6 +295,7 @@
   border-radius: 12px;
   padding: 4px 6px 4px 10px;
   transition: all 0.2s ease;
+  cursor: text;
 }
 
 .input-group:focus-within {
@@ -315,6 +316,9 @@
   max-height: 80px;
   line-height: 1.4;
   padding: 4px 0;
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .chat-input::placeholder {

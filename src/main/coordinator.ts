@@ -148,11 +148,11 @@ export class PetCoordinator {
     if (this.isChatOpen) {
       this.behaviorEngine.setPaused(true);
       this.behaviorEngine.forceState('listen');
+      if (this.petWindow && !this.petWindow.isDestroyed()) {
+        this.petWindow.focus();
+      }
     } else {
       this.behaviorEngine.setPaused(false);
-      if (this.petWindow && !this.petWindow.isDestroyed()) {
-        this.petWindow.setFocusable(false);
-      }
     }
   }
 
@@ -205,7 +205,10 @@ export class PetCoordinator {
         const parsed = WindowSetFocusablePayloadSchema.safeParse(rawPayload);
         if (parsed.success && this.petWindow && !this.petWindow.isDestroyed()) {
           const { focusable } = parsed.data;
-          this.petWindow.setFocusable(focusable);
+          // IMPORTANT: Do NOT call setFocusable(false) dynamically on Windows.
+          // In Electron on Windows, toggling setFocusable dynamically triggers
+          // SWP_FRAMECHANGED in Windows DWM, restoring an unwanted white title bar caption.
+          // We keep focusable: true permanently and only activate focus when requested.
           if (focusable) {
             this.petWindow.focus();
           }
