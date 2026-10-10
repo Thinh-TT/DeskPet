@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppSettings, SecretsStatus } from '@shared/ipc/channels';
+import { AppSettings, SecretsStatus } from '../../../shared/ipc/channels';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -24,6 +24,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   }, [isOpen]);
 
   if (!isOpen || !settings) return null;
+
+  const handleInputFocus = (): void => {
+    void window.deskPetApi?.setFocusable(true);
+  };
+
+  const handleInputBlur = (): void => {
+    void window.deskPetApi?.setFocusable(false);
+  };
 
   const handleSave = async (): Promise<void> => {
     if (!window.deskPetApi) return;
@@ -65,7 +73,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     setIsTesting(true);
     setTestResult(null);
     try {
-      // Lưu key tạm trước khi test nếu người dùng mới gõ
       if (settings.llmProvider === 'gemini' && geminiKeyInput.trim()) {
         await window.deskPetApi.setApiKey({ provider: 'gemini', apiKey: geminiKeyInput.trim() });
       } else if (settings.llmProvider === 'deepseek' && deepseekKeyInput.trim()) {
@@ -88,7 +95,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     <div className="settings-overlay">
       <div className="settings-header">
         <h3 className="settings-title">Cài đặt LLM & Trò chuyện</h3>
-        <button className="btn-icon" onClick={onClose} title="Đóng">
+        <button
+          className="btn-icon"
+          onClick={() => {
+            handleInputBlur();
+            onClose();
+          }}
+          title="Đóng"
+        >
           ✕
         </button>
       </div>
@@ -142,6 +156,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 }
                 value={geminiKeyInput}
                 onChange={(e) => setGeminiKeyInput(e.target.value)}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
               />
             </div>
           </>
@@ -177,6 +193,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 }
                 value={deepseekKeyInput}
                 onChange={(e) => setDeepseekKeyInput(e.target.value)}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
               />
             </div>
           </>

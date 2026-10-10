@@ -1,6 +1,6 @@
 # 003. Kiến trúc Trò Chuyện Text, Cửa Sổ Chat UI và Quản Lý Khóa An Toàn
 
-- **Trạng thái**: Đã chấp thuận (Accepted)
+- **Trạng thái**: Đã thay thế một phần (Partially Superseded bởi [ADR 004](file:///e:/DeskPet/docs/adr/004-hop-nhat-chat-vao-pet-window-single-window.md))
 - **Ngày**: 2026-10-10
 
 ## Bối cảnh
@@ -13,7 +13,7 @@ Giai đoạn 2 (GĐ2) của dự án DeskPet yêu cầu tính năng trò chuyệ
 
 ## Lựa chọn kỹ thuật
 
-### 1. Phân tách Cửa sổ: Cửa sổ Chat Độc Lập (`ChatWindow`)
+### 1. Phân tách Cửa sổ: Cửa sổ Chat Độc Lập (`ChatWindow`) *(Lưu ý: Đã được thay thế bởi [ADR 004](file:///e:/DeskPet/docs/adr/004-hop-nhat-chat-vao-pet-window-single-window.md) sang kiến trúc cửa sổ duy nhất để khắc phục lỗi focus trên Windows 11 DWM)*
 - **Lựa chọn**: Tạo một `BrowserWindow` riêng biệt cho giao diện Chat và Cài đặt, thay vì vẽ trực tiếp vào Canvas hoặc nhúng DOM vào Pet window.
 - **Lý do**:
   - Pet window hiện tại có cờ `focusable: false` và `type: 'toolbar'` để tránh cướp tiêu điểm (focus) của người dùng khi nhân vật di chuyển trên màn hình.

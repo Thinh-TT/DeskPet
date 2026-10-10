@@ -4,7 +4,9 @@ import {
   PetPingResponseSchema,
   PetUserActionPayloadSchema,
   PetSnapshotSchema,
-  AppSettingsSchema
+  AppSettingsSchema,
+  WindowSetFocusablePayloadSchema,
+  ChatToggleUiPayloadSchema
 } from '../../src/shared/ipc/channels';
 
 describe('Shared IPC Schemas', () => {
@@ -63,4 +65,17 @@ describe('Shared IPC Schemas', () => {
       expect(parsed.data.autoStart).toBe(false);
     }
   });
+
+  it('should validate WindowSetFocusablePayloadSchema', () => {
+    expect(WindowSetFocusablePayloadSchema.safeParse({ focusable: true }).success).toBe(true);
+    expect(WindowSetFocusablePayloadSchema.safeParse({ focusable: false }).success).toBe(true);
+    expect(WindowSetFocusablePayloadSchema.safeParse({ focusable: 'true' }).success).toBe(false);
+  });
+
+  it('should validate ChatToggleUiPayloadSchema', () => {
+    expect(ChatToggleUiPayloadSchema.safeParse({}).success).toBe(true);
+    expect(ChatToggleUiPayloadSchema.safeParse({ visible: true }).success).toBe(true);
+    expect(ChatToggleUiPayloadSchema.safeParse({ visible: 'true' }).success).toBe(false);
+  });
 });
+

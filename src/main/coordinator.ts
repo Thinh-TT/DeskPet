@@ -5,7 +5,6 @@ import { SettingsStore } from './config/settings-store';
 import { SecretsStore } from './config/secrets-store';
 import { BehaviorEngine } from './behavior/engine';
 import { TrayManager } from './windows/tray-manager';
-import { ChatWindowManager } from './windows/chat-window';
 import { createPetWindow, getPrimaryWorkAreaBounds } from './windows/pet-window';
 import { LLMManager } from './llm/llm-manager';
 import { ContextManager } from './conversation/context-manager';
@@ -14,13 +13,15 @@ import {
   AppSettings,
   ChatMessage,
   ChatSendMessagePayloadSchema,
+  ChatToggleUiPayloadSchema,
   IpcChannel,
   PetPingPayloadSchema,
   PetPingResponse,
   PetUserActionPayloadSchema,
   SecretsSetKeyPayloadSchema,
   SecretsStatus,
-  SetIgnoreMousePayloadSchema
+  SetIgnoreMousePayloadSchema,
+  WindowSetFocusablePayloadSchema
 } from '../shared/ipc/channels';
 import { CharacterManifest } from '../shared/character/schema';
 
@@ -31,19 +32,18 @@ export class PetCoordinator {
   private secretsStore: SecretsStore;
   private behaviorEngine: BehaviorEngine | null = null;
   private trayManager: TrayManager | null = null;
-  private chatWindowManager: ChatWindowManager;
   private llmManager: LLMManager;
   private contextManager: ContextManager;
   private orchestrator: ConversationOrchestrator;
   private currentManifest: CharacterManifest | null = null;
   private charactersDir: string;
+  private isChatOpen = false;
 
   constructor() {
     this.charactersDir = resolve(app.getAppPath(), 'characters');
     this.packLoader = new CharacterPackLoader(this.charactersDir);
     this.settingsStore = new SettingsStore();
     this.secretsStore = new SecretsStore();
-    this.chatWindowManager = new ChatWindowManager();
     this.llmManager = new LLMManager(this.settingsStore, this.secretsStore);
     this.contextManager = new ContextManager();
     this.orchestrator = new ConversationOrchestrator(
@@ -80,7 +80,7 @@ export class PetCoordinator {
     // 3. Register IPC handlers
     this.registerIpc();
 
-    // 4. Create window
+    // 4. Create single window
     this.petWindow = createPetWindow();
 
     // 5. Setup display listener for multi-monitor / workArea changes
@@ -107,7 +107,7 @@ export class PetCoordinator {
         void this.changeCharacter(packId);
       },
       () => {
-        this.toggleChatWindow();
+        this.toggleChat();
       }
     );
     await this.trayManager.init();
@@ -130,31 +130,29 @@ export class PetCoordinator {
           this.currentManifest
         );
       }
-
-      const chatWin = this.chatWindowManager.getWindow();
-      if (chatWin && !chatWin.isDestroyed()) {
-        chatWin.webContents.send(
-          IpcChannel.PET_CHANGE_CHARACTER,
-          this.currentManifest
-        );
-      }
     } catch (err) {
       console.error(`Failed to change character to ${packId}:`, err);
     }
   }
 
-  toggleChatWindow(): void {
+  toggleChat(visible?: boolean): void {
     if (!this.behaviorEngine) return;
-    const pos = this.behaviorEngine.getSnapshot().position;
-    const chatWin = this.chatWindowManager.getWindow();
+    this.isChatOpen = visible !== undefined ? visible : !this.isChatOpen;
 
-    if (chatWin && chatWin.isVisible()) {
-      this.chatWindowManager.hide();
-      this.behaviorEngine.setPaused(false);
-    } else {
-      this.chatWindowManager.showNearPet(pos.x, pos.y);
+    if (this.petWindow && !this.petWindow.isDestroyed()) {
+      this.petWindow.webContents.send(IpcChannel.CHAT_TOGGLE_UI, {
+        visible: this.isChatOpen
+      });
+    }
+
+    if (this.isChatOpen) {
       this.behaviorEngine.setPaused(true);
       this.behaviorEngine.forceState('listen');
+    } else {
+      this.behaviorEngine.setPaused(false);
+      if (this.petWindow && !this.petWindow.isDestroyed()) {
+        this.petWindow.setFocusable(false);
+      }
     }
   }
 
@@ -202,6 +200,20 @@ export class PetCoordinator {
     );
 
     ipcMain.handle(
+      IpcChannel.WINDOW_SET_FOCUSABLE,
+      (_event, rawPayload: unknown): void => {
+        const parsed = WindowSetFocusablePayloadSchema.safeParse(rawPayload);
+        if (parsed.success && this.petWindow && !this.petWindow.isDestroyed()) {
+          const { focusable } = parsed.data;
+          this.petWindow.setFocusable(focusable);
+          if (focusable) {
+            this.petWindow.focus();
+          }
+        }
+      }
+    );
+
+    ipcMain.handle(
       IpcChannel.PET_USER_ACTION,
       (_event, rawPayload: unknown): void => {
         const parsed = PetUserActionPayloadSchema.safeParse(rawPayload);
@@ -213,7 +225,7 @@ export class PetCoordinator {
             this.behaviorEngine.handleClick();
             break;
           case 'dblclick':
-            this.toggleChatWindow();
+            this.toggleChat();
             break;
           case 'dragStart':
             this.behaviorEngine.handleDragStart();
@@ -256,20 +268,20 @@ export class PetCoordinator {
           throw new Error(`Dữ liệu tin nhắn không hợp lệ: ${parsed.error.message}`);
         }
 
-        const chatWin = this.chatWindowManager.getWindow();
+        const win = this.petWindow;
 
         await this.orchestrator.handleUserMessage(parsed.data.text, {
           onChunk: (messageId, delta) => {
-            if (chatWin && !chatWin.isDestroyed()) {
-              chatWin.webContents.send(IpcChannel.CHAT_STREAM_CHUNK, {
+            if (win && !win.isDestroyed()) {
+              win.webContents.send(IpcChannel.CHAT_STREAM_CHUNK, {
                 messageId,
                 delta
               });
             }
           },
           onDone: (messageId, fullContent, emotion) => {
-            if (chatWin && !chatWin.isDestroyed()) {
-              chatWin.webContents.send(IpcChannel.CHAT_STREAM_DONE, {
+            if (win && !win.isDestroyed()) {
+              win.webContents.send(IpcChannel.CHAT_STREAM_DONE, {
                 messageId,
                 fullContent,
                 emotion
@@ -277,8 +289,8 @@ export class PetCoordinator {
             }
           },
           onError: (messageId, error) => {
-            if (chatWin && !chatWin.isDestroyed()) {
-              chatWin.webContents.send(IpcChannel.CHAT_STREAM_ERROR, {
+            if (win && !win.isDestroyed()) {
+              win.webContents.send(IpcChannel.CHAT_STREAM_ERROR, {
                 messageId,
                 error
               });
@@ -306,9 +318,14 @@ export class PetCoordinator {
       this.orchestrator.clearHistory();
     });
 
-    ipcMain.handle(IpcChannel.CHAT_TOGGLE_WINDOW, (): void => {
-      this.toggleChatWindow();
-    });
+    ipcMain.handle(
+      IpcChannel.CHAT_TOGGLE_WINDOW,
+      (_event, rawPayload: unknown): void => {
+        const parsed = ChatToggleUiPayloadSchema.safeParse(rawPayload);
+        const visible = parsed.success ? parsed.data.visible : undefined;
+        this.toggleChat(visible);
+      }
+    );
 
     ipcMain.handle(
       IpcChannel.CHAT_TEST_CONNECTION,
@@ -339,7 +356,7 @@ export class PetCoordinator {
     const contextMenu = Menu.buildFromTemplate([
       {
         label: 'Trò chuyện... (Chat)',
-        click: (): void => this.toggleChatWindow()
+        click: (): void => this.toggleChat()
       },
       { type: 'separator' },
       {
@@ -380,6 +397,5 @@ export class PetCoordinator {
       this.trayManager.destroy();
       this.trayManager = null;
     }
-    this.chatWindowManager.destroy();
   }
 }

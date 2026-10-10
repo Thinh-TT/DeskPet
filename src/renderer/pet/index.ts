@@ -1,5 +1,8 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
 import type { DeskPetApi } from '../../shared/ipc/channels';
 import { PixiCharacterRenderer } from './pixi-renderer';
+import { PetApp } from './ui/PetApp';
 
 declare global {
   interface Window {
@@ -14,13 +17,15 @@ async function bootstrap(): Promise<void> {
     return;
   }
 
-  const root = document.getElementById('root');
-  if (!root) return;
+  const pixiContainer = document.getElementById('pixi-container');
+  const uiRoot = document.getElementById('ui-root');
+  if (!pixiContainer || !uiRoot) return;
 
+  // 1. Initialize Pixi Character Renderer
   const renderer = new PixiCharacterRenderer();
-  await renderer.init(root);
+  await renderer.init(pixiContainer);
 
-  // Load active character pack
+  // Load initial character pack
   try {
     const manifest = await api.getCharacter();
     await renderer.loadPack(manifest);
@@ -28,7 +33,7 @@ async function bootstrap(): Promise<void> {
     console.error('Failed to load initial character pack:', err);
   }
 
-  // Handle character changes from Tray/Settings
+  // Handle character changes
   api.onCharacterChanged(async (newManifest) => {
     try {
       await renderer.loadPack(newManifest);
@@ -42,24 +47,49 @@ async function bootstrap(): Promise<void> {
     renderer.update(snapshot);
   });
 
-  // Click-through: enable mouse capture when hovering over pet
+  // 2. Hybrid Hit-Testing & Click-Through coordination
+  let isOverPet = false;
+  let isOverUi = false;
+  let isInteracting = false;
+
+  const syncIgnoreMouse = (): void => {
+    const shouldCapture = isOverPet || isOverUi || isInteracting;
+    void api.setIgnoreMouse(!shouldCapture);
+  };
+
   renderer.onPointerStateChange((isOver) => {
-    api.setIgnoreMouse(!isOver);
+    isOverPet = isOver;
+    syncIgnoreMouse();
   });
 
-  // Mouse interaction handling
+  const handleUiPointerChange = (isOver: boolean): void => {
+    isOverUi = isOver;
+    syncIgnoreMouse();
+  };
+
+  // 3. Mount React UI Overlay
+  const reactRoot = createRoot(uiRoot);
+  reactRoot.render(
+    React.createElement(PetApp, {
+      onUiPointerChange: handleUiPointerChange
+    })
+  );
+
+  // 4. Mouse interaction handling on Character
   let isDragging = false;
   let dragThresholdPassed = false;
   let startX = 0;
   let startY = 0;
 
-  root.addEventListener('pointerdown', (e) => {
+  pixiContainer.addEventListener('pointerdown', (e) => {
+    if (!isOverPet) return;
     if (e.button === 0) {
-      // Left mouse button
       isDragging = true;
+      isInteracting = true;
       dragThresholdPassed = false;
       startX = e.clientX;
       startY = e.clientY;
+      syncIgnoreMouse();
     }
   });
 
@@ -71,11 +101,11 @@ async function bootstrap(): Promise<void> {
 
     if (!dragThresholdPassed && (dx > 5 || dy > 5)) {
       dragThresholdPassed = true;
-      api.sendUserAction({ action: 'dragStart' });
+      void api.sendUserAction({ action: 'dragStart' });
     }
 
     if (dragThresholdPassed) {
-      api.sendUserAction({
+      void api.sendUserAction({
         action: 'dragMove',
         position: { x: e.clientX, y: e.clientY }
       });
@@ -86,26 +116,31 @@ async function bootstrap(): Promise<void> {
     if (!isDragging) return;
 
     if (dragThresholdPassed) {
-      api.sendUserAction({
+      void api.sendUserAction({
         action: 'dragEnd',
         position: { x: e.clientX, y: e.clientY }
       });
-    } else {
-      // Normal click
-      api.sendUserAction({ action: 'click' });
+    } else if (e.button === 0) {
+      void api.sendUserAction({ action: 'click' });
     }
 
     isDragging = false;
+    isInteracting = false;
     dragThresholdPassed = false;
+    syncIgnoreMouse();
   });
 
-  root.addEventListener('dblclick', () => {
-    api.sendUserAction({ action: 'dblclick' });
+  pixiContainer.addEventListener('dblclick', () => {
+    if (isOverPet) {
+      void api.sendUserAction({ action: 'dblclick' });
+    }
   });
 
-  root.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    api.sendUserAction({ action: 'contextMenu' });
+  pixiContainer.addEventListener('contextmenu', (e) => {
+    if (isOverPet) {
+      e.preventDefault();
+      void api.sendUserAction({ action: 'contextMenu' });
+    }
   });
 }
 

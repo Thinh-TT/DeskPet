@@ -44,8 +44,7 @@ export default defineConfig({
     build: {
       rollupOptions: {
         input: {
-          pet: resolve(__dirname, 'src/renderer/pet/index.html'),
-          ui: resolve(__dirname, 'src/renderer/ui/index.html')
+          pet: resolve(__dirname, 'src/renderer/pet/index.html')
         }
       }
     }

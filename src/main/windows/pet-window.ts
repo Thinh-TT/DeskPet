@@ -18,38 +18,30 @@ function resolvePreloadPath(): string {
 }
 
 export function createPetWindow(): BrowserWindow {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { x, y, width, height } = primaryDisplay.workArea;
+  const bounds = getPrimaryWorkAreaBounds();
 
   const window = new BrowserWindow({
-    x,
-    y,
-    width,
-    height,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
     show: false,
     autoHideMenuBar: false,
-    transparent: true,
     frame: false,
-    hasShadow: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
+    transparent: true,
+    thickFrame: false,
     resizable: false,
-    minimizable: false,
     maximizable: false,
+    minimizable: false,
     fullscreenable: false,
+    hasShadow: false,
+    skipTaskbar: true,
     focusable: false,
-    type: 'toolbar',
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#00000000',
-      symbolColor: '#00000000',
-      height: 0
-    },
+    alwaysOnTop: true,
     roundedCorners: false,
     backgroundMaterial: 'none',
     backgroundColor: '#00000000',
     title: '',
-    thickFrame: false,
     webPreferences: {
       preload: resolvePreloadPath(),
       sandbox: false,
@@ -59,13 +51,9 @@ export function createPetWindow(): BrowserWindow {
   });
 
   window.setTitle('');
+  window.setAlwaysOnTop(true, 'screen-saver');
 
-  // Safeguard: immediately discard OS focus if redirected to pet window
-  window.on('focus', () => {
-    window.blur();
-  });
-
-  // Permanently strip all menu bars from the pet window
+  // Strip all menu bars from the pet window
   window.setMenu(null);
   window.removeMenu();
   window.setMenuBarVisibility(false);

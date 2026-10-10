@@ -22,7 +22,7 @@ Mỗi giai đoạn (GĐ) kết thúc bằng một bản **chạy được, demo 
 ✅ Xong khi: đạt tiêu chí MVP trong SPEC §5.
 
 ## GĐ2 – Trò chuyện text (Tầng 2)
-- [x] Cửa sổ chat + bong bóng thoại, streaming.
+- [x] Khung chat nhúng trực tiếp trong Pet window (Single Window - ADR 004) + bong bóng thoại, streaming.
 - [x] `LLMProvider` + adapter Gemini (đầu tiên), rồi Deepseek; chọn provider trong Settings.
 - [x] Lưu key an toàn.
 - [x] Persona từ pack; parser thẻ cảm xúc → animation.

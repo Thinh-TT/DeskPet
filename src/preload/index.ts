@@ -29,6 +29,9 @@ const api: DeskPetApi = {
   setIgnoreMouse: (ignore: boolean): Promise<void> =>
     ipcRenderer.invoke(IpcChannel.PET_SET_IGNORE_MOUSE, { ignore }),
 
+  setFocusable: (focusable: boolean): Promise<void> =>
+    ipcRenderer.invoke(IpcChannel.WINDOW_SET_FOCUSABLE, { focusable }),
+
   sendUserAction: (action: PetUserActionPayload): Promise<void> =>
     ipcRenderer.invoke(IpcChannel.PET_USER_ACTION, action),
 
@@ -68,8 +71,18 @@ const api: DeskPetApi = {
   clearChatHistory: (): Promise<void> =>
     ipcRenderer.invoke(IpcChannel.CHAT_CLEAR_HISTORY),
 
-  toggleChatWindow: (): Promise<void> =>
-    ipcRenderer.invoke(IpcChannel.CHAT_TOGGLE_WINDOW),
+  toggleChatWindow: (visible?: boolean): Promise<void> =>
+    ipcRenderer.invoke(IpcChannel.CHAT_TOGGLE_WINDOW, { visible }),
+
+  onToggleChatUi: (callback: (payload?: { visible?: boolean }) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload?: { visible?: boolean }): void => {
+      callback(payload);
+    };
+    ipcRenderer.on(IpcChannel.CHAT_TOGGLE_UI, listener);
+    return () => {
+      ipcRenderer.removeListener(IpcChannel.CHAT_TOGGLE_UI, listener);
+    };
+  },
 
   testConnection: (): Promise<{ success: boolean; message: string }> =>
     ipcRenderer.invoke(IpcChannel.CHAT_TEST_CONNECTION),

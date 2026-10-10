@@ -1,17 +1,36 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChatMessage } from '@shared/ipc/channels';
-import { CharacterManifest } from '@shared/character/schema';
-import { SettingsModal } from './components/SettingsModal';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ChatMessage, PetSnapshot } from '../../../shared/ipc/channels';
+import { CharacterManifest } from '../../../shared/character/schema';
+import { SettingsModal } from './SettingsModal';
 
-export const App: React.FC = () => {
+interface ChatOverlayProps {
+  isOpen: boolean;
+  petSnapshot: PetSnapshot | null;
+  characterManifest: CharacterManifest | null;
+  onClose: () => void;
+  onUiPointerEnter: () => void;
+  onUiPointerLeave: () => void;
+}
+
+export const ChatOverlay: React.FC<ChatOverlayProps> = ({
+  isOpen,
+  petSnapshot,
+  characterManifest,
+  onClose,
+  onUiPointerEnter,
+  onUiPointerLeave
+}) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isBusy, setIsBusy] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [showSettings, setShowSettings] = useState(false);
-  const [character, setCharacter] = useState<CharacterManifest | null>(null);
+  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
+  const [isDraggingHeader, setIsDraggingHeader] = useState(false);
+  const dragStartOffset = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = (): void => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -21,20 +40,17 @@ export const App: React.FC = () => {
     scrollToBottom();
   }, [messages, streamingContent]);
 
+  // Initial load & IPC event subscriptions
   useEffect(() => {
     if (!window.deskPetApi) return;
 
-    // Load initial character & history
-    void window.deskPetApi.getCharacter().then(setCharacter);
     void window.deskPetApi.getChatHistory().then(setMessages);
 
-    // Lắng nghe stream chunks
     const cleanupChunk = window.deskPetApi.onStreamChunk((chunk) => {
       setStreamingContent((prev) => prev + chunk.delta);
       setIsBusy(true);
     });
 
-    // Lắng nghe stream hoàn thành
     const cleanupDone = window.deskPetApi.onStreamDone((done) => {
       setMessages((prev) => [
         ...prev,
@@ -50,7 +66,6 @@ export const App: React.FC = () => {
       setIsBusy(false);
     });
 
-    // Lắng nghe lỗi stream
     const cleanupError = window.deskPetApi.onStreamError((err) => {
       setMessages((prev) => [
         ...prev,
@@ -66,23 +81,83 @@ export const App: React.FC = () => {
       setIsBusy(false);
     });
 
-    const cleanupChar = window.deskPetApi.onCharacterChanged((manifest) => {
-      setCharacter(manifest);
-    });
-
     return () => {
       cleanupChunk();
       cleanupDone();
       cleanupError();
-      cleanupChar();
     };
   }, []);
+
+  // Compute docked position near pet when opening or when pet moves
+  const updateDockedPosition = useCallback(() => {
+    if (!petSnapshot) return;
+    const petW = (characterManifest?.size.w ?? 192) * petSnapshot.scale;
+    const petH = (characterManifest?.size.h ?? 384) * petSnapshot.scale;
+    const chatW = 360;
+    const chatH = 460;
+
+    let targetX = petSnapshot.position.x + petW / 2 + 16;
+    if (targetX + chatW > window.innerWidth - 20) {
+      targetX = petSnapshot.position.x - petW / 2 - chatW - 16;
+    }
+    targetX = Math.max(16, Math.min(targetX, window.innerWidth - chatW - 16));
+
+    let targetY = petSnapshot.position.y - petH;
+    targetY = Math.max(20, Math.min(targetY, window.innerHeight - chatH - 20));
+
+    setPanelPos({ x: Math.round(targetX), y: Math.round(targetY) });
+  }, [petSnapshot, characterManifest]);
+
+  useEffect(() => {
+    if (isOpen && !isDraggingHeader && !panelPos) {
+      updateDockedPosition();
+    }
+  }, [isOpen, updateDockedPosition, isDraggingHeader, panelPos]);
+
+  // Dragging the chat header
+  const handleHeaderPointerDown = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if ((e.target as HTMLElement).tagName === 'BUTTON') return;
+    setIsDraggingHeader(true);
+    const rect = panelRef.current?.getBoundingClientRect();
+    if (rect) {
+      dragStartOffset.current = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    }
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleHeaderPointerMove = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (!isDraggingHeader) return;
+    const newX = Math.max(10, Math.min(e.clientX - dragStartOffset.current.x, window.innerWidth - 370));
+    const newY = Math.max(10, Math.min(e.clientY - dragStartOffset.current.y, window.innerHeight - 470));
+    setPanelPos({ x: newX, y: newY });
+  };
+
+  const handleHeaderPointerUp = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (isDraggingHeader) {
+      setIsDraggingHeader(false);
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        // Ignore if pointer capture already released
+      }
+    }
+  };
+
+  const handleInputFocus = (): void => {
+    void window.deskPetApi?.setFocusable(true);
+  };
+
+  const handleInputBlur = (): void => {
+    void window.deskPetApi?.setFocusable(false);
+  };
 
   const handleSend = async (): Promise<void> => {
     const text = inputText.trim();
     if (!text || isBusy || !window.deskPetApi) return;
 
-    // Hiển thị tin nhắn user ngay lập tức
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -124,18 +199,29 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleClose = async (): Promise<void> => {
-    if (window.deskPetApi) {
-      await window.deskPetApi.toggleChatWindow();
-    }
-  };
+  if (!isOpen) return null;
 
-  const petName = character?.name || 'Odette';
+  const petName = characterManifest?.name || 'Odette';
+  const posX = panelPos?.x ?? 50;
+  const posY = panelPos?.y ?? 50;
 
   return (
-    <div className="chat-container">
+    <div
+      ref={panelRef}
+      className="chat-container single-window-chat"
+      style={{
+        transform: `translate3d(${posX}px, ${posY}px, 0)`
+      }}
+      onMouseEnter={onUiPointerEnter}
+      onMouseLeave={onUiPointerLeave}
+    >
       {/* Header */}
-      <header className="chat-header">
+      <header
+        className="chat-header draggable-header"
+        onPointerDown={handleHeaderPointerDown}
+        onPointerMove={handleHeaderPointerMove}
+        onPointerUp={handleHeaderPointerUp}
+      >
         <div className="chat-title-group">
           <div className="pet-avatar-small">🦢</div>
           <div className="pet-name-info">
@@ -147,6 +233,13 @@ export const App: React.FC = () => {
           </div>
         </div>
         <div className="header-actions">
+          <button
+            className="btn-icon"
+            onClick={updateDockedPosition}
+            title="Đưa về cạnh nhân vật"
+          >
+            ⚓
+          </button>
           <button
             className="btn-icon"
             onClick={() => void handleClearHistory()}
@@ -161,7 +254,14 @@ export const App: React.FC = () => {
           >
             ⚙️
           </button>
-          <button className="btn-icon" onClick={() => void handleClose()} title="Ẩn khung chat">
+          <button
+            className="btn-icon"
+            onClick={() => {
+              handleInputBlur();
+              onClose();
+            }}
+            title="Ẩn khung chat"
+          >
             ✕
           </button>
         </div>
@@ -188,7 +288,6 @@ export const App: React.FC = () => {
           </div>
         ))}
 
-        {/* Streaming Message Bubble */}
         {isBusy && (
           <div className="message-item assistant">
             {streamingContent ? (
@@ -215,6 +314,8 @@ export const App: React.FC = () => {
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
             rows={1}
           />
           <button
@@ -233,5 +334,3 @@ export const App: React.FC = () => {
     </div>
   );
 };
-
-export default App;

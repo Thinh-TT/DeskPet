@@ -6,7 +6,7 @@
 | Desktop shell | **Electron + TypeScript** | Cửa sổ trong suốt, always-on-top, tray, global shortcut; hệ sinh thái Node cho Playwright/MCP. Thay: Tauri (nhẹ hơn, nhưng agent Node phải chạy sidecar). |
 | Build | Vite + electron-vite | Hot reload nhanh. |
 | Renderer nhân vật | **PixiJS** (WebGL) sau interface `CharacterRenderer` | Sprite-sheet/layered 2D chạy tốt; có thể thêm `Live2DRenderer` (pixi-live2d-display) sau mà không đổi phần còn lại. |
-| UI (chat, cài đặt) | React + vanilla CSS | Cửa sổ phụ riêng, không lẫn với cửa sổ nhân vật. |
+| UI (chat, cài đặt) | React + vanilla CSS | Nhúng trực tiếp vào Pet window (Single Window - ADR 004) để triệt tiêu lỗi DWM frame. |
 | LLM | Lớp `LLMProvider` tự định nghĩa; adapter Gemini / OpenAI / Anthropic (SDK chính thức hoặc Vercel AI SDK) | Đổi provider bằng config; hỗ trợ streaming + tool calling. |
 | STT | Interface `STTProvider`; ứng viên: Gemini/OpenAI transcribe, Azure/Google Speech (có `vi-VN`) | Chọn bằng benchmark thực tế ở GĐ3. |
 | TTS | Interface `TTSProvider`; ứng viên: Gemini TTS, OpenAI TTS, Azure `vi-VN` neural, ElevenLabs | Cần streaming, giọng nữ phù hợp nhân vật. |
@@ -35,15 +35,14 @@ flowchart LR
       TOOLS[Tool Registry / MCP / Playwright / Computer-use]
       CFG[Config + Secrets]
     end
-    subgraph R1["Renderer: Pet window"]
-      PIXI[CharacterRenderer]
-    end
-    subgraph R2["Renderer: Chat/Settings"]
-      UI[React UI]
+    subgraph R1["Renderer: Pet Window (Single Transparent Window)"]
+      PIXI[CharacterRenderer (PixiJS Canvas)]
+      UI[Chat & Settings (React DOM Overlay)]
     end
   end
   PIXI <-- IPC --> WM
   UI <-- IPC --> ORCH
+  UI <-- Dynamic Focus --> WM
   ORCH --> LLM
   ORCH --> MEM
   ORCH --> VOICE
@@ -59,7 +58,7 @@ Nguyên tắc: **Main process giữ logic & quyền hạn; renderer chỉ vẽ/h
 ```
 src/
   main/
-    windows/        # pet window, chat window, tray, đa màn hình, click-through
+    windows/        # pet window, tray, đa màn hình, click-through, native DWM
     behavior/       # state machine, di chuyển, lịch idle (thuần logic, test được)
     conversation/   # orchestrator: prompt, ngữ cảnh, emotion tag parser
     llm/            # LLMProvider + adapters + router
@@ -71,8 +70,7 @@ src/
     ipc/            # kênh + schema
   preload/
   renderer/
-    pet/            # PixiJS, CharacterRenderer, lip-sync
-    ui/             # chat, settings, confirm dialog, audit viewer
+    pet/            # PixiJS Canvas + React Chat DOM overlay, lip-sync (Single Window - ADR 004)
   shared/           # types, schema (zod), constants
 characters/         # Character Packs
 docs/

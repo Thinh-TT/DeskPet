@@ -11,6 +11,7 @@ export const IpcChannel = {
   PET_CHANGE_CHARACTER: 'pet:change-character',
   PET_GET_SETTINGS: 'pet:get-settings',
   PET_UPDATE_SETTINGS: 'pet:update-settings',
+  WINDOW_SET_FOCUSABLE: 'window:set-focusable',
   // Chat & LLM
   CHAT_SEND_MESSAGE: 'chat:send-message',
   CHAT_STREAM_CHUNK: 'chat:stream-chunk',
@@ -19,6 +20,7 @@ export const IpcChannel = {
   CHAT_GET_HISTORY: 'chat:get-history',
   CHAT_CLEAR_HISTORY: 'chat:clear-history',
   CHAT_TOGGLE_WINDOW: 'chat:toggle-window',
+  CHAT_TOGGLE_UI: 'chat:toggle-ui',
   CHAT_TEST_CONNECTION: 'chat:test-connection',
   // Secrets
   SECRETS_SET_KEY: 'secrets:set-key',
@@ -26,6 +28,18 @@ export const IpcChannel = {
 } as const;
 
 export type IpcChannelType = (typeof IpcChannel)[keyof typeof IpcChannel];
+
+// Window Focusable
+export const WindowSetFocusablePayloadSchema = z.object({
+  focusable: z.boolean()
+});
+export type WindowSetFocusablePayload = z.infer<typeof WindowSetFocusablePayloadSchema>;
+
+// Chat Toggle UI
+export const ChatToggleUiPayloadSchema = z.object({
+  visible: z.boolean().optional()
+});
+export type ChatToggleUiPayload = z.infer<typeof ChatToggleUiPayloadSchema>;
 
 // Ping
 export const PetPingPayloadSchema = z.object({
@@ -151,6 +165,7 @@ export interface DeskPetApi {
   ping: (payload: PetPingPayload) => Promise<PetPingResponse>;
   getCharacter: () => Promise<CharacterManifest>;
   setIgnoreMouse: (ignore: boolean) => Promise<void>;
+  setFocusable: (focusable: boolean) => Promise<void>;
   sendUserAction: (action: PetUserActionPayload) => Promise<void>;
   getSettings: () => Promise<AppSettings>;
   updateSettings: (settings: Partial<AppSettings>) => Promise<AppSettings>;
@@ -161,7 +176,8 @@ export interface DeskPetApi {
   sendMessage: (payload: ChatSendMessagePayload) => Promise<void>;
   getChatHistory: () => Promise<ChatMessage[]>;
   clearChatHistory: () => Promise<void>;
-  toggleChatWindow: () => Promise<void>;
+  toggleChatWindow: (visible?: boolean) => Promise<void>;
+  onToggleChatUi: (callback: (payload?: ChatToggleUiPayload) => void) => () => void;
   testConnection: () => Promise<{ success: boolean; message: string }>;
   onStreamChunk: (callback: (chunk: ChatStreamChunk) => void) => () => void;
   onStreamDone: (callback: (done: ChatStreamDone) => void) => () => void;
@@ -171,3 +187,4 @@ export interface DeskPetApi {
   setApiKey: (payload: SecretsSetKeyPayload) => Promise<void>;
   getSecretsStatus: () => Promise<SecretsStatus>;
 }
+
